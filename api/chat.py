@@ -1,26 +1,28 @@
-import json
-import os
-import google.generativeai as genai
+export default async function handler(req, res) {
+  const { prompt } = req.body;
 
-genai.configure(api_key=os.environ.get("API_KEY"))
+  if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-def handler(request):
-    try:
-        body = request.json()
-        prompt = body.get("prompt", "")
-        if not prompt:
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "Prompt is required"})
-            }
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "API key not set" });
 
-        response = genai.GenerativeModel("gemini-2.0-flash").generate_content(prompt)
-        return {
-            "statusCode": 200,
-            "body": json.dumps({"reply": response.text})
-        }
-    except Exception as e:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      }
+    );
+
+    const data = await response.json();
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Error: No reply.";
+    res.status(200).json({ reply });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to contact Gemini API" });
+  }
+}
